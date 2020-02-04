@@ -1,0 +1,30 @@
+name: Test Rust project
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        rust: [nightly]
+
+    steps:
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: ${{ matrix.rust }}
+    - uses: actions/checkout@master
+    - name: Run tests
+      env:
+        TELEGRAM_BOT_TOKEN: test
+      run: cargo test --verbose
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: nightly
+    - name: install rustfmt
+      run: rustup component add rustfmt
+    - uses: actions/checkout@master
+    - name: fmt check
+      run: cargo fmt --all -- --check --verbose
