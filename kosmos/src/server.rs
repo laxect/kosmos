@@ -133,7 +133,8 @@ mod tests {
             stream.read_exact(&mut len).await.unwrap();
             let len: u32 = bincode::deserialize(&len).unwrap();
             let mut resp = vec![0u8; len as usize];
-            stream.read_exact(&mut resp)
+            stream
+                .read_exact(&mut resp)
                 .timeout(time::Duration::from_millis(100))
                 .await
                 .unwrap()
