@@ -1,7 +1,6 @@
 use crate::planet::{self, Package};
-use async_std::{io, prelude::*};
+use async_std::{io, os::unix::net, prelude::*, task};
 use async_trait::async_trait;
-pub use domain_socker_server::DomainSocketServer;
 use std::time;
 
 #[async_trait]
@@ -15,7 +14,7 @@ where
 
     async fn run(&self) -> anyhow::Result<()>;
 
-    async fn handle(&self, stream:&mut T) -> anyhow::Result<()> {
+    async fn handle(&self, stream: &mut T) -> anyhow::Result<()> {
         let mut len = [0u8; 4];
         stream.read_exact(&mut len).await?;
         let len: u32 = bincode::deserialize(&len)?;
@@ -38,6 +37,7 @@ where
                 unimplemented!();
             }
             planet::Request::Regist(mut planet) => {
+                planet.update_name()?;
                 let response = match self.set(&mut planet) {
                     Ok(_) => planet::RegistResponse::Success(planet.name()),
                     Err(e) => planet::RegistResponse::Fail(e.to_string()),
@@ -50,65 +50,98 @@ where
     }
 }
 
-mod udp_server {}
+#[derive(Clone)]
+pub struct UnixSocketServer {
+    name: String,
+    name_map: sled::Db,
+}
 
-mod domain_socker_server {
-    use super::{async_trait, planet};
-    use async_std::{os::unix::net, prelude::*, task};
-
-    #[derive(Clone)]
-    pub struct DomainSocketServer {
-        name: String,
-        name_map: sled::Db,
+impl UnixSocketServer {
+    pub fn new(name: String) -> anyhow::Result<Self> {
+        let name_map = sled::open(["/tmp/kosmos/db/", &name].concat())?;
+        Ok(Self { name, name_map })
     }
 
-    impl DomainSocketServer {
-        pub fn new(name: String) -> anyhow::Result<Self> {
-            let name_map = sled::open(["/tmp/kosmos/", &name].concat())?;
-            Ok(Self { name, name_map })
+    pub fn with_custom_db_path(name: String, path: &str) -> anyhow::Result<Self> {
+        let name_map = sled::open(path)?;
+        Ok(Self { name, name_map })
+    }
+}
+
+#[async_trait]
+impl Server<net::UnixStream> for UnixSocketServer {
+    fn set(&self, planet: &mut planet::Planet) -> anyhow::Result<()> {
+        let name = planet.name();
+        let binary_planet: Vec<u8> = bincode::serialize(planet)?;
+        self.name_map.insert(name, binary_planet)?;
+        Ok(())
+    }
+
+    fn get(&self, name: String) -> anyhow::Result<Option<planet::Planet>> {
+        if let Some(binary_planet) = self.name_map.scan_prefix(name).values().nth(0) {
+            let planet = bincode::deserialize(binary_planet?.as_ref())?;
+            Ok(Some(planet))
+        } else {
+            Ok(None)
         }
     }
 
-    #[async_trait]
-    impl super::Server<net::UnixStream> for DomainSocketServer {
-        fn set(&self, planet: &mut planet::Planet) -> anyhow::Result<()> {
-            let name = planet.name();
-            let binary_planet: Vec<u8> = bincode::serialize(planet)?;
-            self.name_map.insert(name, binary_planet)?;
-            Ok(())
+    async fn run(&self) -> anyhow::Result<()> {
+        let listener = net::UnixListener::bind(["/tmp/kosmos/link/", &self.name].concat()).await?;
+        let mut incoming = listener.incoming();
+        while let Some(stream) = incoming.next().await {
+            let mut stream = stream?;
+            let server = self.clone();
+            task::spawn(async move {
+                if let Err(e) = server.handle(&mut stream).await {
+                    eprintln!("Server failed on {}", e);
+                }
+            });
         }
-
-        fn get(&self, name: String) -> anyhow::Result<Option<planet::Planet>> {
-            if let Some(binary_planet) = self.name_map.get(name)? {
-                let planet = bincode::deserialize(binary_planet.as_ref())?;
-                Ok(Some(planet))
-            } else {
-                Ok(None)
-            }
-        }
-
-        async fn run(&self) -> anyhow::Result<()> {
-            let listener = net::UnixListener::bind(["/tmp/", &self.name].concat()).await?;
-            let mut incoming = listener.incoming();
-            while let Some(stream) = incoming.next().await {
-                let mut stream = stream?;
-                let server = self.clone();
-                task::spawn(async move {
-                    if let Err(e) = server.handle(&mut stream).await {
-                        eprintln!("Server failed on {}", e);
-                    }
-                });
-            }
-            Ok(())
-        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use async_std::io;
-    use async_std::task;
+    use super::{super::*, *};
+    use async_std::{io, task};
+
+    #[test]
+    fn set_get() {
+        let server = UnixSocketServer::with_custom_db_path("test".to_owned(), "test").unwrap();
+        let mut planet = planet::Planet::new("test1".to_owned(), planet::AirportKind::UnixSocket);
+        server.set(&mut planet).unwrap();
+        let back = server.get("test1".to_owned()).unwrap();
+        assert_eq!(back, Some(planet));
+    }
+
+    #[test]
+    fn system_test() {
+        task::spawn(async {
+            let server = UnixSocketServer::new("test".to_owned()).unwrap();
+            server.run().await.unwrap();
+        });
+        task::spawn_blocking(async || {
+            use async_std::os::unix::net;
+
+            let mut stream = net::UnixStream::connect("/tmp/kosmos/link/test").await.unwrap();
+            let req = planet::Request::Get("test".to_owned());
+            let req = req.package().unwrap();
+            stream.write(&req).await.unwrap();
+            let mut len = [0u8; 4];
+            stream.read_exact(&mut len).await.unwrap();
+            let len: u32 = bincode::deserialize(&len).unwrap();
+            let mut resp = vec![0u8; len as usize];
+            stream.read_exact(&mut resp)
+                .timeout(time::Duration::from_millis(100))
+                .await
+                .unwrap()
+                .unwrap();
+            let resp: planet::GetResponse = bincode::deserialize(&resp).expect("decode failed");
+            assert_eq!(resp, planet::GetResponse::NotFound);
+        });
+    }
 
     struct TestServer {}
 
@@ -130,13 +163,21 @@ mod tests {
             cur.write(req.as_ref()).await.unwrap();
             let now = cur.position();
             cur.set_position(0);
-            self.handle(&mut cur).timeout(time::Duration::from_millis(100)).await.unwrap().unwrap();
+            self.handle(&mut cur)
+                .timeout(time::Duration::from_millis(100))
+                .await
+                .unwrap()
+                .unwrap();
             cur.set_position(now);
             let mut len = [0u8; 4];
             cur.read_exact(&mut len).await?;
             let len: u32 = bincode::deserialize(&len)?;
             let mut resp = vec![0u8; len as usize];
-            cur.read_exact(&mut resp).timeout(time::Duration::from_millis(100)).await.unwrap().unwrap();
+            cur.read_exact(&mut resp)
+                .timeout(time::Duration::from_millis(100))
+                .await
+                .unwrap()
+                .unwrap();
             let resp: planet::GetResponse = bincode::deserialize(&resp).expect("decode failed");
             assert_eq!(resp, planet::GetResponse::NotFound);
             Ok(())
@@ -144,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn server_trait_test() {
+    fn server_trait_handle() {
         let test_server = TestServer {};
         task::block_on(async move {
             test_server.run().await.unwrap();

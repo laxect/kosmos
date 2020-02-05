@@ -1,9 +1,18 @@
 use serde::{Deserialize, Serialize};
-use std::cmp::PartialEq;
+use std::{cmp::PartialEq, time};
+
+fn get_random_str() -> anyhow::Result<String> {
+    let timestamp = time::SystemTime::now()
+        .duration_since(time::SystemTime::UNIX_EPOCH)?
+        .as_secs();
+    let randint: u32 = rand::random();
+    let fmt = format!("{}-{}", timestamp, randint);
+    Ok(base64::encode(fmt.as_bytes()))
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy)]
 pub(crate) enum AirportKind {
-    DomainSocket,
+    UnixSocket,
     DomainName,
 }
 
@@ -16,6 +25,14 @@ pub(crate) struct Planet {
 impl Planet {
     pub(crate) fn new(name: String, airport_kind: AirportKind) -> Self {
         Planet { name, airport_kind }
+    }
+
+    pub(crate) fn update_name(&mut self) -> anyhow::Result<()> {
+        if !self.name.contains('/') {
+            self.name.push('/');
+            self.name.push_str(get_random_str()?.as_str());
+        }
+        Ok(())
     }
 
     pub(crate) fn name(&self) -> String {
