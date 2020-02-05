@@ -1,5 +1,5 @@
 use crate::planet::{self, Package};
-use async_std::{io, os::unix::net, prelude::*, task, fs};
+use async_std::{fs, io, os::unix::net, prelude::*, task};
 use async_trait::async_trait;
 use std::time;
 
@@ -119,7 +119,7 @@ mod tests {
     use async_std::{io, task};
 
     #[test]
-    fn set_get() ->anyhow::Result<()> {
+    fn set_get() -> anyhow::Result<()> {
         let server = UnixSocketServer::with_custom_db_path("test".to_owned(), "test")?;
         let mut planet = planet::Planet::new("test".to_owned(), planet::AirportKind::UnixSocket);
         planet.update_name()?;
