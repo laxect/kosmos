@@ -1,5 +1,5 @@
 use crate::planet::{self, Package};
-use async_std::{io, os::unix::net, prelude::*, task};
+use async_std::{io, os::unix::net, prelude::*, task, fs};
 use async_trait::async_trait;
 use std::time;
 
@@ -48,6 +48,17 @@ where
         }
         Ok(())
     }
+}
+
+pub async fn link_init() -> anyhow::Result<()> {
+    let path = "/tmp/kosmos/link";
+    let _ = fs::create_dir_all(path).await;
+    let mut dir = fs::read_dir(path).await?;
+    while let Some(res) = dir.next().await {
+        let entry = res?;
+        fs::remove_file(entry.path()).await?;
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -108,16 +119,19 @@ mod tests {
     use async_std::{io, task};
 
     #[test]
-    fn set_get() {
-        let server = UnixSocketServer::with_custom_db_path("test".to_owned(), "test").unwrap();
-        let mut planet = planet::Planet::new("test1".to_owned(), planet::AirportKind::UnixSocket);
-        server.set(&mut planet).unwrap();
-        let back = server.get("test1".to_owned()).unwrap();
+    fn set_get() ->anyhow::Result<()> {
+        let server = UnixSocketServer::with_custom_db_path("test".to_owned(), "test")?;
+        let mut planet = planet::Planet::new("test".to_owned(), planet::AirportKind::UnixSocket);
+        planet.update_name()?;
+        server.set(&mut planet)?;
+        let back = server.get(planet.name())?;
         assert_eq!(back, Some(planet));
+        Ok(())
     }
 
     #[test]
     fn system_test() {
+        task::block_on(link_init()).unwrap();
         task::spawn(async {
             let server = UnixSocketServer::new("test".to_owned()).unwrap();
             server.run().await.unwrap();
