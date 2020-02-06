@@ -71,6 +71,11 @@ impl UnixSocketServer {
         let name_map = sled::open(path)?;
         Ok(Self { name, name_map })
     }
+
+    pub async fn listen(&self) -> anyhow::Result<()> {
+        self.run().await?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -98,8 +103,14 @@ impl Server<net::UnixStream> for UnixSocketServer {
             let mut stream = stream?;
             let server = self.clone();
             task::spawn(async move {
-                if let Err(e) = server.handle(&mut stream).await {
-                    eprintln!("Server failed on {}", e);
+                loop {
+                    match server.handle(&mut stream).await {
+                        Ok(()) => {}
+                        Err(e) => {
+                            eprintln!("Server failed on: {}", e);
+                            break;
+                        }
+                    }
                 }
             });
         }
@@ -111,11 +122,14 @@ impl Server<net::UnixStream> for UnixSocketServer {
 mod tests {
     use super::{super::*, *};
     use async_std::{io, task};
+    use std::sync::Once;
+
+    static ONCE: Once = Once::new();
 
     #[test]
     fn set_get() -> anyhow::Result<()> {
-        let server = UnixSocketServer::with_custom_db_path("test".to_owned(), "test")?;
-        let mut planet = planet::Planet::new("test".to_owned(), planet::AirportKind::UnixSocket);
+        let server = UnixSocketServer::with_custom_db_path("test_set_get".to_owned(), "test/set_get")?;
+        let mut planet = planet::Planet::new("test_set_get".to_owned(), planet::AirportKind::UnixSocket);
         planet.update_name()?;
         server.set(&mut planet)?;
         let back = server.get(planet.name())?;
@@ -125,15 +139,19 @@ mod tests {
 
     #[test]
     fn unix_get() {
-        task::block_on(link_init()).unwrap();
+        ONCE.call_once(|| {
+            task::block_on(link_init()).unwrap();
+        });
         task::spawn(async {
-            let server = UnixSocketServer::new("test".to_owned()).unwrap();
+            let server = UnixSocketServer::with_custom_db_path("test_unix_get".to_owned(), "test/unix_get").unwrap();
             server.run().await.unwrap();
         });
         task::spawn_blocking(async || {
             use async_std::os::unix::net;
 
-            let mut stream = net::UnixStream::connect("/tmp/kosmos/link/test").await.unwrap();
+            let mut stream = net::UnixStream::connect("/tmp/kosmos/link/test_unix_get")
+                .await
+                .unwrap();
             let req = planet::Request::Get("test".to_owned());
             let req = req.package().unwrap();
             stream.write(&req).await.unwrap();
@@ -142,6 +160,49 @@ mod tests {
             let resp: planet::GetResponse = stream.get_obj(len).timeout(expired).await.unwrap().unwrap();
             assert_eq!(resp, planet::GetResponse::NotFound);
         });
+    }
+
+    #[async_std::test]
+    async fn unix_regist_and_resolve() -> anyhow::Result<()> {
+        ONCE.call_once(|| {
+            task::block_on(link_init()).unwrap();
+        });
+        task::spawn(async {
+            // clear db
+            {
+                let db = sled::open("test/test_regist_and_resolve").unwrap();
+                db.clear().unwrap();
+            }
+            let server = UnixSocketServer::with_custom_db_path(
+                "test_regist_and_resolve".to_owned(),
+                "test/test_regist_and_resolve",
+            )
+            .unwrap();
+            server.listen().await.unwrap();
+        });
+        task::sleep(time::Duration::from_millis(500)).await;
+        let mut stream = net::UnixStream::connect("/tmp/kosmos/link/test_regist_and_resolve").await?;
+        let test_planet = planet::Planet::new("test".to_owned(), planet::AirportKind::UnixSocket);
+        let req = planet::Request::Regist(test_planet);
+        let req = req.package()?;
+        stream.write(&req).await?;
+        let len = stream.get_len().await?;
+        let resp: planet::RegistResponse = stream.get_obj(len).await?;
+        if let planet::RegistResponse::Success(name) = resp {
+            let req = planet::Request::Get("test".to_owned());
+            let req = req.package()?;
+            stream.write(&req).await?;
+            let len = stream.get_len().await?;
+            let resp: planet::GetResponse = stream.get_obj(len).await?;
+            if let planet::GetResponse::Get(planet) = resp {
+                assert_eq!(planet.name(), name);
+            } else {
+                panic!("Can not get from server")
+            }
+        } else {
+            panic!("Regist not success")
+        }
+        Ok(())
     }
 
     struct TestServer {}
