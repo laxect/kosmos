@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{cmp::PartialEq, time};
+use std::{cmp::PartialEq, matches, time};
 
 fn get_random_str() -> anyhow::Result<String> {
     let timestamp = time::SystemTime::now()
@@ -38,6 +38,10 @@ impl Planet {
     pub(crate) fn name(&self) -> String {
         self.name.clone()
     }
+
+    pub(crate) fn is_unix_socket(&self) -> bool {
+        matches!(self.airport_kind, AirportKind::UnixSocket)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -63,15 +67,3 @@ pub(crate) enum RegistResponse {
 
 // ping response
 type Pong = u32;
-
-pub trait Package: Serialize + Clone {
-    fn package(self) -> anyhow::Result<Vec<u8>> {
-        let mut binary_self = bincode::serialize(&self)?;
-        let len: u32 = binary_self.len() as u32;
-        let mut pkg = bincode::serialize(&len)?;
-        pkg.append(&mut binary_self);
-        Ok(pkg)
-    }
-}
-
-impl<T: Serialize + Clone> Package for T {}

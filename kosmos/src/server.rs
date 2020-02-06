@@ -1,4 +1,4 @@
-use crate::planet::{self, Package};
+use crate::{planet, utils::*};
 use async_std::{fs, io, os::unix::net, prelude::*, task};
 use async_trait::async_trait;
 use std::time;
@@ -15,16 +15,10 @@ where
     async fn run(&self) -> anyhow::Result<()>;
 
     async fn handle(&self, stream: &mut T) -> anyhow::Result<()> {
-        let mut len = [0u8; 4];
-        stream.read_exact(&mut len).await?;
-        let len: u32 = bincode::deserialize(&len)?;
-        let mut request = vec![0u8; len as usize];
-        stream
-            .read_exact(request.as_mut())
-            .timeout(time::Duration::from_millis(500))
-            .await??;
-        let request: planet::Request = bincode::deserialize(request.as_ref())?;
-        match request {
+        let len = stream.get_len().await?;
+        let expired = time::Duration::from_millis(500);
+        let req: planet::Request = stream.get_obj(len).timeout(expired).await??;
+        match req {
             planet::Request::Get(name) => {
                 let response = match self.get(name)? {
                     Some(planet) => planet::GetResponse::Get(planet),
@@ -130,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn system_test() {
+    fn unix_get() {
         task::block_on(link_init()).unwrap();
         task::spawn(async {
             let server = UnixSocketServer::new("test".to_owned()).unwrap();
@@ -143,17 +137,9 @@ mod tests {
             let req = planet::Request::Get("test".to_owned());
             let req = req.package().unwrap();
             stream.write(&req).await.unwrap();
-            let mut len = [0u8; 4];
-            stream.read_exact(&mut len).await.unwrap();
-            let len: u32 = bincode::deserialize(&len).unwrap();
-            let mut resp = vec![0u8; len as usize];
-            stream
-                .read_exact(&mut resp)
-                .timeout(time::Duration::from_millis(100))
-                .await
-                .unwrap()
-                .unwrap();
-            let resp: planet::GetResponse = bincode::deserialize(&resp).expect("decode failed");
+            let len = stream.get_len().await.unwrap();
+            let expired = time::Duration::from_millis(100);
+            let resp: planet::GetResponse = stream.get_obj(len).timeout(expired).await.unwrap().unwrap();
             assert_eq!(resp, planet::GetResponse::NotFound);
         });
     }
@@ -172,28 +158,17 @@ mod tests {
 
         // run test
         async fn run(&self) -> anyhow::Result<()> {
+            let expired = time::Duration::from_millis(100);
             let mut cur = io::Cursor::new(Vec::<u8>::new());
             let req = planet::Request::Get("test".to_owned());
             let req = req.package()?;
             cur.write(req.as_ref()).await.unwrap();
             let now = cur.position();
             cur.set_position(0);
-            self.handle(&mut cur)
-                .timeout(time::Duration::from_millis(100))
-                .await
-                .unwrap()
-                .unwrap();
+            self.handle(&mut cur).timeout(expired).await.unwrap().unwrap();
             cur.set_position(now);
-            let mut len = [0u8; 4];
-            cur.read_exact(&mut len).await?;
-            let len: u32 = bincode::deserialize(&len)?;
-            let mut resp = vec![0u8; len as usize];
-            cur.read_exact(&mut resp)
-                .timeout(time::Duration::from_millis(100))
-                .await
-                .unwrap()
-                .unwrap();
-            let resp: planet::GetResponse = bincode::deserialize(&resp).expect("decode failed");
+            let len = cur.get_len().await.unwrap();
+            let resp: planet::GetResponse = cur.get_obj(len).timeout(expired).await.unwrap().unwrap();
             assert_eq!(resp, planet::GetResponse::NotFound);
             Ok(())
         }
