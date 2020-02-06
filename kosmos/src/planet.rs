@@ -66,4 +66,5 @@ pub(crate) enum RegistResponse {
 }
 
 // ping response
-type Pong = u32;
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub(crate) struct Pong {}

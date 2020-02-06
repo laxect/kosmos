@@ -8,6 +8,8 @@ trait Server<T>
 where
     T: io::Write + io::Read + Send + Sync + 'static + Unpin,
 {
+    fn expire(&self, name: String) -> anyhow::Result<()>;
+
     fn set(&self, planet: &mut planet::Planet) -> anyhow::Result<()>;
 
     fn get(&self, name: String) -> anyhow::Result<Option<planet::Planet>>;
@@ -27,8 +29,16 @@ where
                 let pkg = response.package()?;
                 stream.write(pkg.as_ref()).await?;
             }
-            planet::Request::Ping(_name) => {
-                unimplemented!();
+            planet::Request::Ping(name) => {
+                if let Ok(_ping_stream) = net::UnixStream::connect(["/tmp/kosmos/link/", name.as_ref()].concat()).await
+                {
+                    // do nothing
+                    let resp = planet::Pong {};
+                    let resp = resp.package()?;
+                    stream.write(&resp).await?;
+                } else {
+                    self.expire(name)?;
+                }
             }
             planet::Request::Regist(mut planet) => {
                 planet.update_name()?;
@@ -88,12 +98,17 @@ impl Server<net::UnixStream> for UnixSocketServer {
     }
 
     fn get(&self, name: String) -> anyhow::Result<Option<planet::Planet>> {
-        if let Some(binary_planet) = self.name_map.scan_prefix(name).values().nth(0) {
+        if let Some(binary_planet) = self.name_map.scan_prefix(name).values().next() {
             let planet = bincode::deserialize(binary_planet?.as_ref())?;
             Ok(Some(planet))
         } else {
             Ok(None)
         }
+    }
+
+    fn expire(&self, name: String) -> anyhow::Result<()> {
+        self.name_map.remove(name)?;
+        Ok(())
     }
 
     async fn run(&self) -> anyhow::Result<()> {
@@ -215,6 +230,10 @@ mod tests {
 
         fn get(&self, _name: String) -> anyhow::Result<Option<planet::Planet>> {
             Ok(None)
+        }
+
+        fn expire(&self, _name: String) -> anyhow::Result<()> {
+            Ok(())
         }
 
         // run test
