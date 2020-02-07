@@ -72,7 +72,8 @@ pub struct UnixSocketServer {
 }
 
 impl UnixSocketServer {
-    pub fn new(name: String) -> anyhow::Result<Self> {
+    pub fn new<T: Into<String>>(name: T) -> anyhow::Result<Self> {
+        let name = name.into();
         let name_map = sled::open(["/tmp/kosmos/db/", &name].concat())?;
         Ok(Self { name, name_map })
     }
@@ -84,6 +85,11 @@ impl UnixSocketServer {
 
     pub async fn listen(&self) -> anyhow::Result<()> {
         self.run().await?;
+        Ok(())
+    }
+
+    pub fn clear(&self) -> anyhow::Result<()> {
+        self.name_map.clear()?;
         Ok(())
     }
 }

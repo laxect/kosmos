@@ -3,21 +3,17 @@ use async_std::{os::unix::net, prelude::*};
 
 const KOSMOS_SERVER: &str = "/tmp/kosmos/link/kosmos";
 
-pub enum Stream {
-    UnixSocket(net::UnixStream),
-}
-
 #[derive(Clone, Debug)]
-pub struct UnixCLient {
+pub struct UnixClient {
     name: String,
 }
 
-impl UnixCLient {
+impl UnixClient {
     pub fn new(name: String) -> Self {
         Self { name }
     }
 
-    pub async fn regist(&self) -> anyhow::Result<()> {
+    pub async fn regist(&mut self) -> anyhow::Result<String> {
         let mut stream = net::UnixStream::connect(KOSMOS_SERVER).await?;
         let me = planet::Planet::new(self.name.clone(), planet::AirportKind::UnixSocket);
         let req = planet::Request::Regist(me);
@@ -27,17 +23,17 @@ impl UnixCLient {
         let len = stream.get_len().await?;
         let resp: planet::RegistResponse = stream.get_obj(len).await?;
         match resp {
-            planet::RegistResponse::Success(_) => {}
-            planet::RegistResponse::Fail(e) => {
-                eprintln!("Regist failed: {}", e);
+            planet::RegistResponse::Success(new_name) => {
+                self.name = new_name.clone();
+                Ok(new_name)
             }
+            planet::RegistResponse::Fail(e) => Err(anyhow::Error::msg(e)),
         }
-        Ok(())
     }
 
-    async fn resolve(&self, name: String) -> anyhow::Result<Option<planet::Planet>> {
+    async fn resolve(&self, name: &str) -> anyhow::Result<Option<planet::Planet>> {
         let mut stream = net::UnixStream::connect(KOSMOS_SERVER).await?;
-        let req = planet::Request::Get(name);
+        let req = planet::Request::Get(name.to_owned());
         let req = req.package()?;
         stream.write(req.as_ref()).await?;
         let len = stream.get_len().await?;
@@ -48,22 +44,23 @@ impl UnixCLient {
         }
     }
 
-    async fn ping(&self, name: String) -> anyhow::Result<()> {
+    async fn ping(&self, name: &str) -> anyhow::Result<()> {
         let mut stream = net::UnixStream::connect(KOSMOS_SERVER).await?;
-        let req = planet::Request::Ping(name);
+        let req = planet::Request::Ping(name.to_owned());
         let req = req.package()?;
         stream.write(req.as_ref()).await?;
         Ok(())
     }
 
-    pub async fn connent(&self, name: String) -> anyhow::Result<Stream> {
-        let planet = self.resolve(name.clone()).await?;
+    pub async fn connect<T: Into<String>>(&self, name: T) -> anyhow::Result<net::UnixStream> {
+        let name = name.into();
+        let planet = self.resolve(&name).await?;
         if let Some(planet) = planet {
             if planet.is_unix_socket() {
-                if let Ok(stream) = net::UnixStream::connect(planet.name()).await {
-                    return Ok(Stream::UnixSocket(stream));
+                if let Ok(stream) = net::UnixStream::connect(["/tmp/kosmos/link/", &planet.name()].concat()).await {
+                    return Ok(stream);
                 } else {
-                    self.ping(name).await?;
+                    self.ping(&planet.name()).await?;
                     return Err(anyhow::Error::msg("can not connect."));
                 }
             } else {
@@ -74,8 +71,9 @@ impl UnixCLient {
     }
 
     // must regist first
-    pub async fn listen(&self) -> anyhow::Result<net::UnixStream> {
-        let stream = net::UnixStream::connect(["/tmp/kosmos/link/", self.name.as_ref()].concat()).await?;
+    pub async fn listen(&self) -> anyhow::Result<net::UnixListener> {
+        println!("name - {}", self.name);
+        let stream = net::UnixListener::bind(["/tmp/kosmos/link/", self.name.as_ref()].concat()).await?;
         Ok(stream)
     }
 }

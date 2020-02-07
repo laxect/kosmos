@@ -1,0 +1,20 @@
+[package]
+name = "yukikaze_test"
+version = "0.1.0"
+authors = ["gyara <me@gyara.moe>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kosmos = { path = "../../kosmos" }
+anyhow = "1.0.26"
+yukikaze = { path = "../../yukikaze" }
+
+[dependencies.async-std]
+version = "1.5.0"
+features = ["attributes"]
+
+[dependencies.serde]
+version = "1.0.104"
+features = ["derive"]

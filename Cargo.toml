@@ -1,5 +1,11 @@
 [workspace]
 
 members = [
-    "kosmos"
+    "kosmos",
+    "yukikaze",
+    "terminus",
+]
+
+exclude = [
+    "tests/yukikaze_test"
 ]

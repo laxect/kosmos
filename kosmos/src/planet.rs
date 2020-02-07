@@ -28,8 +28,8 @@ impl Planet {
     }
 
     pub(crate) fn update_name(&mut self) -> anyhow::Result<()> {
-        if !self.name.contains('/') {
-            self.name.push('/');
+        if !self.name.contains(':') {
+            self.name.push(':');
             self.name.push_str(get_random_str()?.as_str());
         }
         Ok(())

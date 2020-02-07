@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[async_trait]
-pub(crate) trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
+pub trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
     async fn get_len(&mut self) -> anyhow::Result<u32> {
         let mut len = [0u8; 4];
         self.read_exact(&mut len).await?;
