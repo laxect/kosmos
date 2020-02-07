@@ -4,8 +4,5 @@ members = [
     "kosmos",
     "yukikaze",
     "terminus",
-]
-
-exclude = [
-    "tests/yukikaze_test"
+    "tests/yukikaze_test",
 ]

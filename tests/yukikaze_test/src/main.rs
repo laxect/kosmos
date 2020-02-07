@@ -1,6 +1,6 @@
+use async_std::prelude::*;
 use kosmos::{client::UnixClient, utils::*};
 use yukikaze::Request;
-use async_std::prelude::*;
 
 #[async_std::main]
 async fn main() -> anyhow::Result<()> {

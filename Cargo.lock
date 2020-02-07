@@ -1379,3 +1379,14 @@ dependencies = [
  "telegram_types",
  "thiserror",
 ]
+
+[[package]]
+name = "yukikaze_test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "kosmos",
+ "serde",
+ "yukikaze",
+]
