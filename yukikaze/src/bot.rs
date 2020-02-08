@@ -69,6 +69,7 @@ impl Bot {
         Ok(updates)
     }
 
+    #[allow(dead_code)]
     pub async fn text_reply<T: Into<String>>(&self, message: types::Message, text: T) -> anyhow::Result<()> {
         let chat_id = methods::ChatTarget::Id(message.chat.id);
         let reply_to = message.message_id;

@@ -16,8 +16,11 @@ where
 
     async fn run(&self) -> anyhow::Result<()>;
 
-    async fn handle(&self, stream: &mut T) -> anyhow::Result<()> {
+    async fn handle(&self, stream: &mut T) -> anyhow::Result<Status> {
         let len = stream.get_len().await?;
+        if len == 0 {
+            return Ok(Status::Exit);
+        }
         let expired = time::Duration::from_millis(500);
         let req: planet::Request = stream.get_obj(len).timeout(expired).await??;
         match req {
@@ -50,7 +53,7 @@ where
                 stream.write(pkg.as_ref()).await?;
             }
         }
-        Ok(())
+        Ok(Status::Continue)
     }
 }
 
@@ -126,7 +129,8 @@ impl Server<net::UnixStream> for UnixSocketServer {
             task::spawn(async move {
                 loop {
                     match server.handle(&mut stream).await {
-                        Ok(()) => {}
+                        Ok(Status::Continue) => {}
+                        Ok(Status::Exit) => break,
                         Err(e) => {
                             eprintln!("Server failed on: {}", e);
                             break;

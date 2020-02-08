@@ -51,3 +51,25 @@ mod tests {
         Ok(())
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum Status {
+    Continue,
+    Exit,
+}
+
+impl Status {
+    pub fn is_exit(self) -> bool {
+        match self {
+            Self::Exit => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_continue(self) -> bool {
+        match self {
+            Self::Continue => true,
+            _ => false,
+        }
+    }
+}

@@ -2,6 +2,8 @@ use crate::{planet, utils::*};
 use async_std::{os::unix::net, prelude::*};
 
 const KOSMOS_SERVER: &str = "/tmp/kosmos/link/kosmos";
+const EXIT: [u8; 4] = [0u8; 4];
+const CAN_NOT_CONNECT: &str = "can not connect";
 
 #[derive(Clone, Debug)]
 pub struct UnixClient {
@@ -22,6 +24,7 @@ impl UnixClient {
         // parser response
         let len = stream.get_len().await?;
         let resp: planet::RegistResponse = stream.get_obj(len).await?;
+        stream.write(&EXIT).await?;
         match resp {
             planet::RegistResponse::Success(new_name) => {
                 self.name = new_name.clone();
@@ -38,6 +41,7 @@ impl UnixClient {
         stream.write(req.as_ref()).await?;
         let len = stream.get_len().await?;
         let resp: planet::GetResponse = stream.get_obj(len).await?;
+        stream.write(&EXIT).await?;
         match resp {
             planet::GetResponse::Get(planet) => Ok(Some(planet)),
             _ => Ok(None),
@@ -49,6 +53,7 @@ impl UnixClient {
         let req = planet::Request::Ping(name.to_owned());
         let req = req.package()?;
         stream.write(req.as_ref()).await?;
+        stream.write(&EXIT).await?;
         Ok(())
     }
 
@@ -61,7 +66,7 @@ impl UnixClient {
                     return Ok(stream);
                 } else {
                     self.ping(&planet.name()).await?;
-                    return Err(anyhow::Error::msg("can not connect."));
+                    return Err(anyhow::Error::msg(CAN_NOT_CONNECT));
                 }
             } else {
                 unimplemented!();
@@ -70,10 +75,40 @@ impl UnixClient {
         Err(anyhow::Error::msg("can not resolve target planet"))
     }
 
+    pub async fn connect_until_success<T: Into<String>>(&self, name: T) -> anyhow::Result<net::UnixStream> {
+        let name = name.into();
+        loop {
+            match self.connect(&name).await {
+                Err(e) => {
+                    if e.to_string() == CAN_NOT_CONNECT {
+                        continue;
+                    } else {
+                        break Err(e);
+                    }
+                }
+                Ok(stream) => {
+                    break Ok(stream);
+                }
+            }
+        }
+    }
+
     // must regist first
     pub async fn listen(&self) -> anyhow::Result<net::UnixListener> {
         println!("name - {}", self.name);
         let stream = net::UnixListener::bind(["/tmp/kosmos/link/", self.name.as_ref()].concat()).await?;
         Ok(stream)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Error;
+
+    #[test]
+    fn ensure_anyhow_msg_error() {
+        const MSG: &str = "test";
+        let e = Error::msg(MSG);
+        assert_eq!(e.to_string(), MSG);
     }
 }

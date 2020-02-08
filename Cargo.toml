@@ -4,5 +4,7 @@ members = [
     "kosmos",
     "yukikaze",
     "terminus",
+    "aoi",
     "tests/yukikaze_test",
+    "tests/yukikaze_test2",
 ]

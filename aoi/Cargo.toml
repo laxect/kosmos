@@ -1,5 +1,5 @@
 [package]
-name = "yukikaze"
+name = "aoi"
 version = "0.1.0"
 authors = ["gyara <me@gyara.moe>"]
 edition = "2018"
@@ -9,11 +9,7 @@ edition = "2018"
 [dependencies]
 kosmos = { path = "../kosmos" }
 anyhow = "1.0.26"
-telegram_types = "0.5.0"
-surf = "1.0.3"
-thiserror = "1.0.10"
-lazy_static = "1.4.0"
-dotenv = "0.15.0"
+yukikaze = { path = "../yukikaze" }
 
 [dependencies.async-std]
 version = "1.5.0"
