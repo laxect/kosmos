@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Ask(String);
+pub struct Ask(pub String);
 
 impl Ask {
     pub fn new(s: String) -> Ask {
