@@ -33,15 +33,12 @@ pub(crate) struct Postamt {
 async fn handle(stream: &mut net::UnixStream) -> anyhow::Result<Status> {
     println!("handle");
     let len = stream.get_len().await?;
-    dbg!(len);
     if len == 0 {
         return Ok(Status::Exit);
     }
     let Ask(msg) = stream.get_obj(len).await?;
-    dbg!(&msg);
     let mut head = String::from("aoi ");
     head.push_str(&msg);
-    dbg!(&head);
     let args = head.split_whitespace();
     let req = request::Request::from_iter_safe(args)?;
     let namespace = req.namespace();
@@ -104,11 +101,10 @@ impl Postamt {
             task::spawn(async move {
                 loop {
                     match handle(&mut stream).await {
-                        Ok(Status::Continue) => {},
+                        Ok(Status::Continue) => {}
                         Ok(Status::Exit) => break,
                         Err(e) => {
                             println!("{}", e);
-                            println!("{}", e.backtrace());
                             break;
                         }
                     }

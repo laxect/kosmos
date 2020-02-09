@@ -32,7 +32,7 @@ impl Default for Postamt {
     }
 }
 
-pub(crate) async fn handle(stream: &mut net::UnixStream) -> anyhow::Result<Status> {
+pub(crate) async fn handle(stream: &mut net::UnixStream, chat_id: types::ChatId) -> anyhow::Result<Status> {
     let len = stream.get_len().await?;
     if len == 0 {
         return Ok(Status::Exit);
@@ -40,7 +40,7 @@ pub(crate) async fn handle(stream: &mut net::UnixStream) -> anyhow::Result<Statu
     let req: Request = stream.get_obj(len).await?;
     let bot = bot::Bot::new(&TOKEN);
     let text = req.to_owned();
-    bot.send_message(text, *CHANNEL).await?;
+    bot.send_message(text, chat_id).await?;
     Ok(Status::Continue)
 }
 
@@ -64,7 +64,7 @@ impl Postamt {
             let mut stream = stream?;
             task::spawn(async move {
                 loop {
-                    match handle(&mut stream).await {
+                    match handle(&mut stream, *CHANNEL).await {
                         Ok(Status::Continue) => continue,
                         Ok(Status::Exit) => break,
                         Err(e) => {
@@ -82,7 +82,12 @@ impl Postamt {
         let mut bot = bot.unwrap_or_else(|| bot::Bot::new(&TOKEN));
         let updates = bot.get_updates().await.unwrap();
         let mut u = updates.into_iter();
-        while let Some(types::Message { text: Some(text), .. }) = u.next() {
+        while let Some(types::Message {
+            text: Some(text),
+            chat: box types::Chat { id: chat_id, .. },
+            ..
+        }) = u.next()
+        {
             println!("{}", &text);
             let mut words: Vec<String> = text.splitn(2, ' ').map(|x| x.to_owned()).collect();
             let cmd = words.pop().ok_or_else(|| anyhow::Error::msg("expect a command"))?;
@@ -95,7 +100,7 @@ impl Postamt {
                 let mut stream = self.kosmos.connect_until_success(target).await?;
                 task::spawn(async move || -> anyhow::Result<()> {
                     stream.write(&ask).await?;
-                    while handle(&mut stream).await?.is_continue() {}
+                    while handle(&mut stream, chat_id).await?.is_continue() {}
                     Ok(())
                 }());
             }

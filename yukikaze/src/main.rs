@@ -1,4 +1,4 @@
-#![feature(async_closure)]
+#![feature(async_closure, box_patterns)]
 mod bot;
 mod postamt;
 
