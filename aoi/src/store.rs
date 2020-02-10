@@ -48,6 +48,11 @@ impl Store {
         }
         Ok(keys)
     }
+
+    pub(crate) fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> anyhow::Result<bool> {
+        let res = self.inner.contains_key(key)?;
+        Ok(res)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
