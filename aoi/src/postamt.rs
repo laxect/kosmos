@@ -115,6 +115,15 @@ impl Postamt {
     }
 }
 
+pub(crate) async fn send_message<T: Into<String>>(msg: T) -> anyhow::Result<()> {
+    let client = UnixClient::new("aoi".into());
+    let mut stream = client.connect_until_success("yukikaze").await?;
+    let req = yukikaze_msg(msg.into())?;
+    stream.write(&req).await?;
+    stream.write(&EXIT).await?;
+    Ok(())
+}
+
 impl Default for Postamt {
     fn default() -> Postamt {
         Postamt::new("aoi")

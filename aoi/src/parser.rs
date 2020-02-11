@@ -1,4 +1,5 @@
-use crate::store::Store;
+use crate::{postamt::send_message, store::Store};
+use async_std::task;
 use serde::{Deserialize, Serialize};
 
 const LN_XML_URI: &str = "https://www.lightnovel.us/forum.php?mod=rss&fid=173";
@@ -95,6 +96,10 @@ pub(crate) async fn fetch_index(uri: &str) -> anyhow::Result<()> {
         if let Some(PageStatus::Pending) = watch_list.get(&link)? {
             // send notification
             println!("{} - {}", &link, &title);
+            let msg = format!("新しNovel :: {}\n{}", title, link);
+            task::spawn(async move {
+                send_message(msg).await.unwrap();
+            });
             let new_val = PageStatus::Complete;
             watch_list.insert(&link, &new_val)?;
         }
