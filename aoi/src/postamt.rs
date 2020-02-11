@@ -1,4 +1,4 @@
-use crate::{request, store};
+use crate::{parser, request, store};
 use async_std::{os::unix::net, prelude::*, task};
 use kosmos::{client::UnixClient, utils::*};
 use structopt::StructOpt;
@@ -14,7 +14,7 @@ fn yukikaze_msg(msg: String) -> anyhow::Result<Vec<u8>> {
 fn format_keys(keys: Vec<String>, mut top: String) -> anyhow::Result<Vec<u8>> {
     top.push('\n');
     for s in keys.iter() {
-        top.push_str("  -");
+        top.push_str("  - ");
         top.push_str(s);
         top.push('\n');
     }
@@ -47,7 +47,7 @@ async fn handle(stream: &mut net::UnixStream) -> anyhow::Result<Status> {
     match item {
         request::Item::Add { name: args } => {
             for key in args.into_iter() {
-                let val = store::WatchTarget {};
+                let val = parser::PageStatus::Pending;
                 tree.insert(key, &val)?;
             }
             let keys = tree.keys()?;

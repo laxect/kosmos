@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 const DB_PATH: &str = "/tmp/kosmos/db/aoi";
 
@@ -17,6 +17,15 @@ impl Store {
         let tree = DB.open_tree(name)?;
         let store = Self { inner: tree };
         Ok(store)
+    }
+
+    pub(crate) fn get<K: AsRef<[u8]>, T: DeserializeOwned>(&self, key: &K) -> anyhow::Result<Option<T>> {
+        let val = self.inner.get(key)?;
+        let val = match val {
+            Some(val) => Some(bincode::deserialize(&val)?),
+            None => None,
+        };
+        Ok(val)
     }
 
     pub(crate) fn insert<V: AsRef<[u8]>, T: Serialize>(&self, key: V, val: &T) -> anyhow::Result<()> {
@@ -54,6 +63,3 @@ impl Store {
         Ok(res)
     }
 }
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub(crate) struct WatchTarget {}

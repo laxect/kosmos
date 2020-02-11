@@ -15,8 +15,18 @@ async fn main() -> anyhow::Result<()> {
         postamt.listen().await?;
         Ok(())
     }());
+    let update = task::spawn(async {
+        let ten_min = std::time::Duration::from_secs(600);
+        loop {
+            if let Err(e) = parser::fetch_and_parse().await {
+                eprintln!("update - {}", e);
+            }
+            task::sleep(ten_min).await;
+        }
+    });
     if let Err(e) = postamt.await {
         eprintln!("postamt - {}", e);
     }
+    update.await;
     Ok(())
 }
