@@ -1,6 +1,36 @@
 use async_std::io;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
+use std::ops::Deref;
+
+#[derive(Clone)]
+pub enum ReadResult<T> {
+    Exit,
+    Continue(T),
+}
+
+impl<T> From<ReadResult<T>> for Status {
+    fn from(rr: ReadResult<T>) -> Status {
+        match rr {
+            ReadResult::Exit => Status::Exit,
+            ReadResult::Continue(_) => Status::Continue,
+        }
+    }
+}
+
+const C_EXIT: Status = Status::Exit;
+const C_CONTINUE: Status = Status::Continue;
+
+impl<T> Deref for ReadResult<T> {
+    type Target = Status;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ReadResult::Exit => &C_EXIT,
+            ReadResult::Continue(_) => &C_CONTINUE,
+        }
+    }
+}
 
 #[async_trait]
 pub trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
@@ -16,6 +46,15 @@ pub trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
         self.read_exact(buffer.as_mut()).await?;
         let obj = bincode::deserialize(&buffer)?;
         Ok(obj)
+    }
+
+    async fn unpack<T: DeserializeOwned>(&mut self) -> anyhow::Result<ReadResult<T>> {
+        let len = self.get_len().await?;
+        if len == 0 {
+            return Ok(ReadResult::Exit);
+        }
+        let obj = self.get_obj(len).await?;
+        Ok(ReadResult::Continue(obj))
     }
 }
 
