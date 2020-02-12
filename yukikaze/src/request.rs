@@ -14,7 +14,7 @@ impl Request {
 impl Into<String> for Request {
     fn into(self) -> String {
         match self {
-            Request::Post { msg, node } => format!("{}\n\n------{} - 雪風Dタイプ", msg, node),
+            Request::Post { msg, node } => format!("{}\n\n------\n{} - 雪風Dタイプ", msg, node),
         }
     }
 }
