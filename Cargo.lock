@@ -646,6 +646,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "github_release"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "bincode",
+ "kosmos",
+ "lazy_static",
+ "serde",
+ "sled",
+ "structopt",
+ "surf",
+ "yukikaze",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
