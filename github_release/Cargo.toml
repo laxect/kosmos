@@ -1,0 +1,28 @@
+[package]
+name = "github_release"
+version = "0.1.0"
+authors = ["gyara <me@gyara.moe>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kosmos = { path = "../kosmos" }
+anyhow = "1.0.26"
+yukikaze = { path = "../yukikaze" }
+lazy_static = "1.4.0"
+sled = "0.31.0"
+bincode = "1.2.1"
+surf = "1.0.3"
+
+[dependencies.async-std]
+version = "1.5.0"
+features = ["attributes"]
+
+[dependencies.serde]
+version = "1.0.104"
+features = ["derive"]
+
+[dependencies.structopt]
+version = "0.3.9"
+default-features = false
