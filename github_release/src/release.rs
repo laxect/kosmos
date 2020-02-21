@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use crate::target;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct User {
@@ -60,4 +62,23 @@ pub(crate) struct Release {
     published_at: String,
     author: User,
     assets: Vec<Asset>,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum SurfError {
+    #[error("Surf Error: {0}")]
+    Error(#[from] surf::Exception),
+}
+
+async fn get_release<R: Display, U: Display>(user: U, repo: R) -> Result<Release, SurfError> {
+    let uri = format!("https://api.github.com/repos/{}/{}/releases/latest", user, repo);
+    let release: Release = surf::get(uri).recv_json().await?; 
+    Ok(release)
+}
+
+pub(crate) async fn get(target: target::Target) -> anyhow::Result<Release> {
+    let user = target.get_user();
+    let repo = target.get_repo();
+    let release = get_release(user, repo).await?;
+    Ok(release)
 }
