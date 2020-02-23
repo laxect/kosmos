@@ -33,7 +33,7 @@ impl<T> Deref for ReadResult<T> {
 }
 
 #[async_trait]
-pub trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
+pub trait BufferEx: io::Write + io::prelude::WriteExt + io::Read + io::ReadExt + Unpin + Send {
     async fn get_len(&mut self) -> anyhow::Result<u32> {
         let mut len = [0u8; 4];
         self.read_exact(&mut len).await?;
@@ -56,9 +56,27 @@ pub trait ReadEx: io::Read + io::ReadExt + Unpin + Send {
         let obj = self.get_obj(len).await?;
         Ok(ReadResult::Continue(obj))
     }
+
+    async fn send<T: Package + Send + Sync>(&mut self, pkg: &T) -> anyhow::Result<()> {
+        let bin_pkg = pkg.package()?;
+        self.write(&bin_pkg).await?;
+        Ok(())
+    }
+
+    async fn exit(&mut self) -> anyhow::Result<()> {
+        let exit_signal = [0u8; 4];
+        self.write(&exit_signal).await?;
+        Ok(())
+    }
+
+    async fn send_once<T: Package + Send + Sync>(&mut self, pkg: &T) -> anyhow::Result<()> {
+        self.send(pkg).await?;
+        self.exit().await?;
+        Ok(())
+    }
 }
 
-impl<T: io::Write + io::Read + Send + Sync + 'static + Unpin> ReadEx for T {}
+impl<T: io::Write + io::Read + Send + Sync + 'static + Unpin> BufferEx for T {}
 
 pub trait Package: Serialize + Clone {
     fn package(&self) -> anyhow::Result<Vec<u8>> {
