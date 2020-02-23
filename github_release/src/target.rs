@@ -1,7 +1,9 @@
+use crate::{postamt, release};
+use async_std::task;
 use once_cell::sync as cell;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct Target(String, String);
 
 impl Target {
@@ -43,11 +45,13 @@ impl ToString for Target {
 
 static STORE: cell::Lazy<sled::Db> = cell::Lazy::new(|| sled::open("/tmp/kosmos/db/github_release").unwrap());
 
-const BEHOLDER: [u8; 0] = [0u8; 0];
+type Update = Option<String>;
 
 fn add(target: &Target) -> anyhow::Result<()> {
     let bin_target = bincode::serialize(target)?;
-    STORE.insert(bin_target, &BEHOLDER)?;
+    let mark: Update = None;
+    let bin_mark = bincode::serialize(&mark)?;
+    STORE.insert(bin_target, bin_mark)?;
     Ok(())
 }
 
@@ -57,7 +61,22 @@ fn remove(target: &Target) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub(crate) fn list() -> anyhow::Result<Vec<Target>> {
+fn check_and_update(target: &Target, new_ver: &str) -> anyhow::Result<bool> {
+    let new_ver = Some(new_ver.to_owned());
+    let bin_target = bincode::serialize(&target)?;
+    let bin_mark = bincode::serialize(&new_ver)?;
+    if let Some(bin_old_ver) = STORE.insert(bin_target, bin_mark)? {
+        let old_ver: Update = bincode::deserialize(&bin_old_ver)?;
+        if old_ver == new_ver {
+            return Ok(false);
+        }
+    } else {
+        return Ok(true);
+    }
+    Ok(true)
+}
+
+fn list() -> anyhow::Result<Vec<Target>> {
     let mut res = Vec::new();
     for key in STORE.iter().keys() {
         let key = key?;
@@ -103,4 +122,47 @@ pub(crate) fn cmd<T: Into<String>>(input: T) -> anyhow::Result<String> {
         }
     }
     Ok(resp)
+}
+
+async fn update_handle(target: Target) -> anyhow::Result<()> {
+    let release = release::get(target.clone()).await?;
+    let new_ver = release.tag_name.clone();
+    println!("{} - {}", target.to_string(), new_ver);
+    if check_and_update(&target, &new_ver)? {
+        let name = target.get_repo();
+        println!("post");
+        postamt::post(name, &new_ver).await?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn update() -> anyhow::Result<()> {
+    let ts = list()?;
+    for t in ts.into_iter() {
+        task::spawn(async move {
+            if let Err(e) = update_handle(t).await {
+                eprintln!("Error: {}", e);
+            }
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() -> anyhow::Result<()> {
+        let target = Target::from("test/test");
+        add(&target)?;
+        let first = check_and_update(&target, "0.1.0")?;
+        assert!(first);
+        let second = check_and_update(&target, "0.1.0")?;
+        assert!(!second);
+        let third = check_and_update(&target, "0.2.0")?;
+        assert!(third);
+        remove(&target)?;
+        Ok(())
+    }
 }

@@ -11,7 +11,8 @@ pub struct UnixClient {
 }
 
 impl UnixClient {
-    pub fn new(name: String) -> Self {
+    pub fn new<T: Into<String>>(name: T) -> Self {
+        let name = name.into();
         Self { name }
     }
 
