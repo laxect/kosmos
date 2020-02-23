@@ -80,7 +80,7 @@ impl Postamt {
 
     pub(crate) async fn incoming(&self, bot: Option<bot::Bot>) -> anyhow::Result<bot::Bot> {
         let mut bot = bot.unwrap_or_else(|| bot::Bot::new(&TOKEN));
-        let updates = bot.get_updates().await.unwrap();
+        let updates = bot.get_updates().await?;
         let mut u = updates.into_iter();
         while let Some(types::Message {
             text: Some(text),
@@ -97,10 +97,18 @@ impl Postamt {
             } else {
                 let ask = Ask::new(cmd);
                 let ask = ask.package()?;
-                let mut stream = self.kosmos.connect_until_success(target).await?;
+                let two_sec: std::time::Duration = std::time::Duration::from_secs(2);
+                let mut stream = self.kosmos.connect_until_success(target).timeout(two_sec).await??;
                 task::spawn(async move || -> anyhow::Result<()> {
                     stream.write(&ask).await?;
-                    while handle(&mut stream, chat_id).await?.is_continue() {}
+                    loop {
+                        let res = handle(&mut stream, chat_id).await;
+                        match res {
+                            Err(e) => println!("{}", e),
+                            Ok(Status::Continue) => continue,
+                            Ok(Status::Exit) => break,
+                        }
+                    }
                     Ok(())
                 }());
             }

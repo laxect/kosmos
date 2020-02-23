@@ -17,7 +17,14 @@ async fn main() -> anyhow::Result<()> {
         let postamt = postamt::Postamt::default();
         let mut bot = None;
         loop {
-            bot = postamt.incoming(bot).await?.into();
+            bot = postamt
+                .incoming(bot)
+                .await
+                .map_err(|e| {
+                    eprintln!("postamt - error: {}", e);
+                    e
+                })
+                .ok();
             let two_sec = std::time::Duration::from_secs(2);
             task::sleep(two_sec).await;
         }

@@ -10,13 +10,9 @@ async fn main() -> anyhow::Result<()> {
     let mut incoming = listener.incoming();
     for stream in incoming.next().await {
         let mut stream = stream?;
-        let len = stream.get_len().await?;
-        if len == 0 {
-            return Ok(());
-        }
-        let Ask(obj) = stream.get_obj(len).await?;
-        println!("{:?}", obj);
-        let post = Request::post(obj, "test".to_owned());
+        let ka: ReadResult<Ask> = stream.unpack().await?;
+        println!("{:?}", ka);
+        let post = Request::post("test2".to_owned(), "test".to_owned());
         let resp = post.package()?;
         stream.write(&resp).await?;
         let exit = [0u8; 4];
