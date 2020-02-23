@@ -104,7 +104,10 @@ impl Postamt {
                     loop {
                         let res = handle(&mut stream, chat_id).await;
                         match res {
-                            Err(e) => println!("{}", e),
+                            Err(e) => {
+                                println!("{}", e);
+                                break;
+                            }
                             Ok(Status::Continue) => continue,
                             Ok(Status::Exit) => break,
                         }
