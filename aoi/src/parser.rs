@@ -75,8 +75,12 @@ fn translate_uri(uri: String) -> anyhow::Result<String> {
         // doesn't need translate
         return Ok(uri);
     }
-    let extra = uri.find("&extra").ok_or_else(|| anyhow::Error::msg("can not translate"))?;
-    let tid = uri.find("&tid").ok_or_else(|| anyhow::Error::msg("can not translate"))?;
+    let extra = uri
+        .find("&extra")
+        .ok_or_else(|| anyhow::Error::msg("can not translate"))?;
+    let tid = uri
+        .find("&tid")
+        .ok_or_else(|| anyhow::Error::msg("can not translate"))?;
     let tid = tid + 5;
     let tid: u32 = uri[tid..extra].parse()?;
     let uri = format!("https://www.lightnovel.us/thread-{}-1-1.html", tid);
