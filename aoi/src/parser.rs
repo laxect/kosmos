@@ -41,7 +41,7 @@ pub(crate) async fn fetch_rss() -> anyhow::Result<()> {
     let id_key = "update_id".to_owned();
     let mut new_id = 0;
     let id: u32 = config.get(&id_key)?.unwrap_or_default();
-    for item in rss_parser.items().into_iter() {
+    for item in rss_parser.items().iter() {
         let title = item.title().unwrap_or_default();
         let link = item.link().unwrap_or_default();
         let this_id = parse_id(link)?;
@@ -75,8 +75,8 @@ fn translate_uri(uri: String) -> anyhow::Result<String> {
         // doesn't need translate
         return Ok(uri);
     }
-    let extra = uri.find("&extra").ok_or(anyhow::Error::msg("can not translate"))?;
-    let tid = uri.find("&tid").ok_or(anyhow::Error::msg("can not translate"))?;
+    let extra = uri.find("&extra").ok_or_else(|| anyhow::Error::msg("can not translate"))?;
+    let tid = uri.find("&tid").ok_or_else(|| anyhow::Error::msg("can not translate"))?;
     let tid = tid + 5;
     let tid: u32 = uri[tid..extra].parse()?;
     let uri = format!("https://www.lightnovel.us/thread-{}-1-1.html", tid);

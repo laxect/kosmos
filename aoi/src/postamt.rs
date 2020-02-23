@@ -21,8 +21,7 @@ fn format_keys(keys: Vec<String>, mut top: String) -> anyhow::Result<Vec<u8>> {
     if top.ends_with("\n\n") {
         top.pop();
     }
-    let msg = yukikaze_msg(top);
-    msg
+    yukikaze_msg(top)
 }
 
 #[derive(Clone)]
