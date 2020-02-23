@@ -41,3 +41,17 @@ pub(crate) async fn listen() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+static POST_CLIENT: cell::Lazy<client::UnixClient> = cell::Lazy::new(|| client::UnixClient::new("github_release"));
+
+pub(crate) async fn post(target: &str, version: &str) -> anyhow::Result<()> {
+    let msg = format!("{} release {}.", target, version);
+    let req = Request::post(msg, String::from("Github_watcher"));
+    let req = req.package()?;
+    let sec_2 = std::time::Duration::from_secs(2);
+    let mut stream = POST_CLIENT.connect_until_success("yukikaze").timeout(sec_2).await??;
+    stream.write(&req).await?;
+    let exit = [0u8; 4];
+    stream.write(&exit).await?;
+    Ok(())
+}
