@@ -2,7 +2,10 @@ use crate::{postamt::send_message, store::Store};
 use async_std::task;
 use serde::{Deserialize, Serialize};
 
-const LN_XML_URI: &str = "https://www.lightnovel.us/forum.php?mod=rss&fid=173";
+const LN_XML_URI: &str = "https://www.lightnovel.cn/forum.php?mod=rss&fid=173";
+const LN_REPOST_URI: &str = "https://www.lightnovel.cn/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=365";
+const LN_TRANSLATE_URI: &str = "https://www.lightnovel.cn/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=369";
+const LN_INPUT_URI: &str = "https://www.lightnovel.cn/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=367";
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub(crate) enum PageStatus {
@@ -83,7 +86,7 @@ fn translate_uri(uri: String) -> anyhow::Result<String> {
         .ok_or_else(|| anyhow::Error::msg("can not translate"))?;
     let tid = tid + 5;
     let tid: u32 = uri[tid..extra].parse()?;
-    let uri = format!("https://www.lightnovel.us/thread-{}-1-1.html", tid);
+    let uri = format!("https://www.lightnovel.cn/thread-{}-1-1.html", tid);
     Ok(uri)
 }
 
@@ -111,10 +114,6 @@ pub(crate) async fn fetch_index(uri: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-const LN_REPOST_URI: &str = "https://www.lightnovel.us/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=365";
-const LN_TRANSLATE_URI: &str = "https://www.lightnovel.us/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=369";
-const LN_INPUT_URI: &str = "https://www.lightnovel.us/forum.php?mod=forumdisplay&fid=173&filter=typeid&typeid=367";
-
 pub(crate) async fn fetch_and_parse() -> anyhow::Result<()> {
     fetch_rss().await?;
     fetch_index(LN_REPOST_URI).await?;
@@ -129,7 +128,7 @@ mod tests {
 
     #[test]
     fn parse_id_test() -> anyhow::Result<()> {
-        let input = "https://www.lightnovel.us/thread-1016638-1-1.html";
+        let input = "https://www.lightnovel.cn/thread-1016638-1-1.html";
         let out = 1016638;
         let id = parse_id(input)?;
         assert_eq!(out, id);
@@ -138,8 +137,8 @@ mod tests {
 
     #[test]
     fn translate_uri_test() -> anyhow::Result<()> {
-        let input = "https://www.lightnovel.us/forum.php?mod=viewthread&tid=1015421&extra=page%3D1%26filter%3Dtypeid%26typeid%3D367";
-        let expect_out = "https://www.lightnovel.us/thread-1015421-1-1.html";
+        let input = "https://www.lightnovel.cn/forum.php?mod=viewthread&tid=1015421&extra=page%3D1%26filter%3Dtypeid%26typeid%3D367";
+        let expect_out = "https://www.lightnovel.cn/thread-1015421-1-1.html";
         let real_out = translate_uri(input.to_owned())?;
         assert_eq!(real_out, expect_out);
         Ok(())
