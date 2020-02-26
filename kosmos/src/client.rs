@@ -94,6 +94,13 @@ impl UnixClient {
         }
     }
 
+    pub async fn send_once<N: Into<String>, T: Package>(&self, name: N, pkg: &T) -> anyhow::Result<()> {
+        let mut stream = self.connect_until_success(name).await?;
+        stream.send(pkg).await?;
+        stream.exit().await?;
+        Ok(())
+    }
+
     // must regist first
     pub async fn listen(&self) -> anyhow::Result<net::UnixListener> {
         println!("name - {}", self.name);

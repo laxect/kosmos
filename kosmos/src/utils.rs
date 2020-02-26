@@ -78,7 +78,7 @@ pub trait BufferEx: io::Write + io::prelude::WriteExt + io::Read + io::ReadExt +
 
 impl<T: io::Write + io::Read + Send + Sync + 'static + Unpin> BufferEx for T {}
 
-pub trait Package: Serialize + Clone {
+pub trait Package: Serialize + Clone + Send + Sync {
     fn package(&self) -> anyhow::Result<Vec<u8>> {
         let mut binary_self = bincode::serialize(&self)?;
         let len: u32 = binary_self.len() as u32;
@@ -88,7 +88,7 @@ pub trait Package: Serialize + Clone {
     }
 }
 
-impl<T: Serialize + Clone> Package for T {}
+impl<T: Serialize + Clone + Send + Sync> Package for T {}
 
 #[cfg(test)]
 mod tests {
