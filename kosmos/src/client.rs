@@ -103,7 +103,7 @@ impl UnixClient {
 
     // must regist first
     pub async fn listen(&self) -> anyhow::Result<net::UnixListener> {
-        println!("name - {}", self.name);
+        log::info!(target: "unix client", "name - {}", self.name);
         let stream = net::UnixListener::bind(["/tmp/kosmos/link/", self.name.as_ref()].concat()).await?;
         Ok(stream)
     }

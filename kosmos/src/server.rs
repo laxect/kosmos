@@ -132,7 +132,7 @@ impl Server<net::UnixStream> for UnixSocketServer {
                         Ok(Status::Continue) => {}
                         Ok(Status::Exit) => break,
                         Err(e) => {
-                            eprintln!("Server failed on: {}", e);
+                            log::error!(target: "kosmos server", "Server failed on: {}", e);
                             break;
                         }
                     }

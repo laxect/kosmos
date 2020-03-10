@@ -45,7 +45,7 @@ impl<T: XenoHandler> XenoClient<T> {
                         Ok(Status::Continue) => {}
                         Ok(Status::Exit) => break,
                         Err(e) => {
-                            eprintln!("Xeno Error: {}", e);
+                            log::error!(target:"xeno client", "Xeno Error: {}", e);
                             break;
                         }
                     }
