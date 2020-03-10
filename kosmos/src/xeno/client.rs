@@ -42,13 +42,12 @@ impl<T: XenoHandler> XenoClient<T> {
                 let mut stream = stream.unwrap();
                 loop {
                     match recv_in(&handler, &mut stream).await {
-                        Ok(Status::Continue) => {},
-                        Ok(Status::Exit) => {break},
+                        Ok(Status::Continue) => {}
+                        Ok(Status::Exit) => break,
                         Err(e) => {
                             eprintln!("Xeno Error: {}", e);
                             break;
                         }
-
                     }
                 }
             });
