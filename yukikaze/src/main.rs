@@ -7,6 +7,7 @@ use async_std::task;
 #[async_std::main]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
+    env_logger::init();
     let postamt = task::spawn(async || -> anyhow::Result<()> {
         let mut postamt = postamt::Postamt::default();
         postamt.regist().await?;

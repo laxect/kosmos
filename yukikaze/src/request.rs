@@ -18,3 +18,7 @@ impl Into<String> for Request {
         }
     }
 }
+
+pub fn post<M: Into<String>, N: Into<String>>(msg: M, node: N) -> Request {
+    Request::post(msg.into(), node.into())
+}

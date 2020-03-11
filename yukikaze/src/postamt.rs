@@ -38,6 +38,7 @@ pub(crate) async fn handle(stream: &mut net::UnixStream, chat_id: types::ChatId)
         return Ok(Status::Exit);
     }
     let req: Request = stream.get_obj(len).await?;
+    log::info!("received request: {:?}", req);
     let bot = bot::Bot::new(&TOKEN);
     let text = req.to_owned();
     bot.send_message(text, chat_id).await?;
