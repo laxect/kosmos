@@ -19,8 +19,9 @@ pub struct XenoClient<T: XenoHandler + 'static> {
 async fn recv_in<T: XenoHandler + 'static>(handler: &T, stream: &mut UnixStream) -> anyhow::Result<Status> {
     let input: ReadResult<T::In> = stream.unpack().await?;
     if let ReadResult::Continue(input) = input {
-        let output = handler.handle(input).await?;
-        stream.send(&output).await?;
+        if let Some(output) = handler.handle(input).await? {
+            stream.send(&output).await?;
+        }
     } else {
         return Ok(Status::Exit);
     }
@@ -31,6 +32,11 @@ impl<T: XenoHandler> XenoClient<T> {
     pub fn new<N: Into<String>>(name: N, handler: T) -> Self {
         let client = UnixClient::new(name);
         Self { client, handler }
+    }
+
+    pub async fn regist(&mut self) -> anyhow::Result<()> {
+        self.client.regist().await?;
+        Ok(())
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {

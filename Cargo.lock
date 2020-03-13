@@ -2544,15 +2544,16 @@ dependencies = [
 
 [[package]]
 name = "yukikaze"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-trait",
  "dotenv",
  "env_logger",
  "kosmos",
- "lazy_static",
  "log",
+ "once_cell",
  "serde",
  "surf",
  "telegram_types",
