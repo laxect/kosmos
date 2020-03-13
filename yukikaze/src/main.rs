@@ -10,6 +10,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let postamt = task::spawn(async {
         let mut to_tg = postamt::kosmos_to_tg();
+        to_tg.regist().await.unwrap();
         if let Err(e) = to_tg.run().await {
             log::error!("kosmos to tg error: {}", e);
         }
