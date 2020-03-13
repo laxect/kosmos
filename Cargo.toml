@@ -7,7 +7,6 @@ members = [
     "aoi",
     "github_release",
     "sora",
-    "bangumi",
     "tests/yukikaze_test",
     "tests/yukikaze_test2",
 ]
