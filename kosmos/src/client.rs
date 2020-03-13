@@ -8,12 +8,13 @@ const CAN_NOT_CONNECT: &str = "can not connect";
 #[derive(Clone, Debug)]
 pub struct UnixClient {
     name: String,
+    registed: bool,
 }
 
 impl UnixClient {
     pub fn new<T: Into<String>>(name: T) -> Self {
         let name = name.into();
-        Self { name }
+        Self { name, registed: false }
     }
 
     pub async fn regist(&mut self) -> anyhow::Result<String> {
@@ -26,6 +27,7 @@ impl UnixClient {
         let len = stream.get_len().await?;
         let resp: planet::RegistResponse = stream.get_obj(len).await?;
         stream.write(&EXIT).await?;
+        self.registed = true;
         match resp {
             planet::RegistResponse::Success(new_name) => {
                 self.name = new_name.clone();
@@ -103,6 +105,9 @@ impl UnixClient {
 
     // must regist first
     pub async fn listen(&self) -> anyhow::Result<net::UnixListener> {
+        if !self.registed {
+            panic!("Must regist first!");
+        }
         log::info!(target: "unix client", "name - {}", self.name);
         let stream = net::UnixListener::bind(["/tmp/kosmos/link/", self.name.as_ref()].concat()).await?;
         Ok(stream)
