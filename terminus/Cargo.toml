@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 kosmos = { path = "../kosmos" }
-anyhow = "1.0.27"
+anyhow = "1.0.28"
 
 [dependencies.async-std]
 version = "1.5.0"
