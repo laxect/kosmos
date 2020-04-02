@@ -1,18 +1,28 @@
-name: test
+name: Test Rust project
 on: [push, pull_request]
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        rust: [nightly]
-
+    runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@master
+    - name: Cache cargo registry
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo index
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo build
+      uses: actions/cache@v1
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
     - uses: hecrj/setup-rust-action@master
       with:
-        rust-version: ${{ matrix.rust }}
-    - uses: actions/checkout@master
+        rust-version: nightly
     - name: Run tests
       env:
         TELEGRAM_BOT_TOKEN: test
@@ -23,8 +33,7 @@ jobs:
     - uses: hecrj/setup-rust-action@master
       with:
         rust-version: nightly
-    - name: install rustfmt
-      run: rustup component add rustfmt
+        components: rustfmt
     - uses: actions/checkout@master
     - name: fmt check
       run: cargo fmt --all -- --check --verbose
