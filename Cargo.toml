@@ -2,11 +2,4 @@
 
 members = [
     "kosmos",
-    "yukikaze",
-    "terminus",
-    "aoi",
-    "github_release",
-    "sora",
-    "tests/yukikaze_test",
-    "tests/yukikaze_test2",
 ]
