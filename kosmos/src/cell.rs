@@ -52,7 +52,7 @@ where
 {
     fn set_source(&mut self, source: sync::Receiver<S>) -> Result<(), CellError> {
         if self.source.is_some() {
-            return Err(CellError::SourceExist);
+            Err(CellError::SourceExist)?;
         }
         self.source = Some(source);
         Ok(())
@@ -60,7 +60,7 @@ where
 
     fn set_next(&mut self, next: sync::Sender<N>) -> Result<(), CellError> {
         if self.next.is_some() {
-            return Err(CellError::NextExist);
+            Err(CellError::NextExist)?;
         }
         self.next = Some(next);
         Ok(())
@@ -76,10 +76,10 @@ where
 
     fn check_set(&self) -> Result<(), CellError> {
         if self.source.is_none() {
-            return Err(CellError::SourceNotExist);
+            Err(CellError::SourceNotExist)?;
         }
         if self.next.is_none() {
-            return Err(CellError::NextNotExist);
+            Err(CellError::NextNotExist)?;
         }
         Ok(())
     }
@@ -128,7 +128,7 @@ where
                 Ok(n) => self.send(n).await,
                 Err(e) => {
                     log::error!("Cell Error: {}", e);
-                    return Err(CellError::from(e));
+                    Err(CellError::from(e))?;
                 }
             }
         }
@@ -171,7 +171,7 @@ where
 {
     fn set_source(&mut self, source: sync::Receiver<S>) -> Result<(), CellError> {
         if self.source.is_some() {
-            return Err(CellError::SourceExist);
+            Err(CellError::SourceExist)?;
         }
         self.source = Some(source);
         Ok(())
@@ -179,7 +179,7 @@ where
 
     fn set_next(&mut self, next: sync::Sender<()>) -> Result<(), CellError> {
         if self.next.is_some() {
-            return Err(CellError::NextExist);
+            Err(CellError::NextExist)?;
         }
         self.next = Some(next);
         Ok(())
@@ -195,7 +195,7 @@ where
 
     fn check_set(&self) -> Result<(), CellError> {
         if self.source.is_none() {
-            return Err(CellError::SourceNotExist);
+            Err(CellError::SourceNotExist)?;
         }
         // null Cell can have no next
         Ok(())
