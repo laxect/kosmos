@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.28"
-thiserror = "1.0.14"
+thiserror = "1.0.15"
 bincode = "1.2.1"
 sled = "0.31.0"
 async-trait = "0.1.30"
