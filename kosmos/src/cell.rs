@@ -107,7 +107,7 @@ where
     }
 }
 
-pub struct TailCell<S, L> 
+pub struct TailCell<S, L>
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
     L: Lambda<S, ()>,
@@ -116,7 +116,7 @@ where
     lambda: Box<L>,
 }
 
-impl <S, L>NextCell<S> for TailCell<S, L>
+impl<S, L> NextCell<S> for TailCell<S, L>
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
     L: Lambda<S, ()>,
@@ -131,7 +131,7 @@ where
 }
 
 #[async_trait]
-impl <S, L>KosmosCell<S, ()> for TailCell<S, L>
+impl<S, L> KosmosCell<S, ()> for TailCell<S, L>
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
     L: Lambda<S, ()>,
@@ -147,8 +147,8 @@ where
     async fn run(&self) -> Result<(), CellError> {
         self.check_set()?;
         if let Some(input) = self.source.as_ref().unwrap().recv().await {
-            match self.lambda.call((input, )) {
-                Ok(()) => {},
+            match self.lambda.call((input,)) {
+                Ok(()) => {}
                 Err(e) => {
                     log::error!("Cell Lambda Failed: {}", e);
                     Err(e)?;
@@ -211,9 +211,10 @@ where
 {
 }
 
-impl <S, N, F>Lambda<S, N> for F
+impl<S, N, F> Lambda<S, N> for F
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
     N: Serialize + DeserializeOwned + Send + Sync + 'static,
     F: Sync + Sized + Clone + Send + 'static + Fn(S) -> anyhow::Result<N>,
-{}
+{
+}
