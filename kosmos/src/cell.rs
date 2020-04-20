@@ -116,6 +116,19 @@ where
     lambda: Box<L>,
 }
 
+impl<S, L> TailCell<S, L>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, ()>,
+{
+    pub fn new(lambda: L) -> Self {
+        Self {
+            source: None,
+            lambda: Box::new(lambda),
+        }
+    }
+}
+
 impl<S, L> NextCell<S> for TailCell<S, L>
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
