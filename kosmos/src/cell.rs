@@ -43,6 +43,36 @@ where
     }
 }
 
+impl<S, N, L> SourceCell<N> for Cell<S, N, L>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    N: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, N>,
+{
+    fn set_next(&mut self, send: sync::Sender<N>) -> Result<(), CellError> {
+        if self.next.is_some() {
+            Err(CellError::NextExist)?;
+        }
+        self.next = Some(send);
+        Ok(())
+    }
+}
+
+impl<S, N, L> NextCell<S> for Cell<S, N, L>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    N: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, N>,
+{
+    fn set_source(&mut self, recv: sync::Receiver<S>) -> Result<(), CellError> {
+        if self.source.is_some() {
+            Err(CellError::SourceExist)?;
+        }
+        self.source = Some(recv);
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl<S, N, L> KosmosCell<S, N> for Cell<S, N, L>
 where
@@ -50,42 +80,82 @@ where
     N: Serialize + DeserializeOwned + Send + Sync + 'static,
     L: Lambda<S, N>,
 {
-    fn set_source(&mut self, source: sync::Receiver<S>) -> Result<(), CellError> {
+    fn check_set(&self) -> Result<(), CellError> {
+        if self.source.is_none() {
+            Err(CellError::SourceNotExist)
+        } else if self.next.is_none() {
+            Err(CellError::NextNotExist)
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn run(&self) -> Result<(), CellError> {
+        self.check_set()?;
+        if let Some(input) = self.source.as_ref().unwrap().recv().await {
+            match self.lambda.call((input,)) {
+                Ok(out) => {
+                    self.next.as_ref().unwrap().send(out).await;
+                }
+                Err(e) => {
+                    log::error!("Cell Lambda failed: {}", e);
+                    Err(e)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct TailCell<S, L> 
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, ()>,
+{
+    source: Option<sync::Receiver<S>>,
+    lambda: Box<L>,
+}
+
+impl <S, L>NextCell<S> for TailCell<S, L>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, ()>,
+{
+    fn set_source(&mut self, recv: sync::Receiver<S>) -> Result<(), CellError> {
         if self.source.is_some() {
             Err(CellError::SourceExist)?;
         }
-        self.source = Some(source);
+        self.source = Some(recv);
         Ok(())
     }
+}
 
-    fn set_next(&mut self, next: sync::Sender<N>) -> Result<(), CellError> {
-        if self.next.is_some() {
-            Err(CellError::NextExist)?;
-        }
-        self.next = Some(next);
-        Ok(())
-    }
-
-    async fn recv(&self) -> Option<S> {
-        self.source.as_ref().unwrap().recv().await
-    }
-
-    async fn send(&self, pkg: N) {
-        self.next.as_ref().map(async move |s| s.send(pkg).await);
-    }
-
+#[async_trait]
+impl <S, L>KosmosCell<S, ()> for TailCell<S, L>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+    L: Lambda<S, ()>,
+{
     fn check_set(&self) -> Result<(), CellError> {
         if self.source.is_none() {
-            Err(CellError::SourceNotExist)?;
+            Err(CellError::SourceNotExist)
+        } else {
+            Ok(())
         }
-        if self.next.is_none() {
-            Err(CellError::NextNotExist)?;
-        }
-        Ok(())
     }
 
-    async fn lambda(&self, input: S) -> anyhow::Result<N> {
-        self.lambda.run(input).await
+    async fn run(&self) -> Result<(), CellError> {
+        self.check_set()?;
+        if let Some(input) = self.source.as_ref().unwrap().recv().await {
+            match self.lambda.call((input, )) {
+                Ok(()) => {},
+                Err(e) => {
+                    log::error!("Cell Lambda Failed: {}", e);
+                    Err(e)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -96,44 +166,9 @@ where
     N: Serialize + DeserializeOwned + Send + Sync + 'static,
     Self: Sized + Sync + Send + 'static,
 {
-    fn set_source(&mut self, source: sync::Receiver<S>) -> Result<(), CellError>;
-
-    fn set_next(&mut self, next: sync::Sender<N>) -> Result<(), CellError>;
-
-    async fn recv(&self) -> Option<S>;
-
-    async fn send(&self, pkg: N);
-
-    async fn lambda(&self, input: S) -> anyhow::Result<N>;
-
-    fn link_to<ON, OL, C>(&mut self, other: &mut C) -> Result<(), CellError>
-    where
-        C: KosmosCell<N, ON>,
-        ON: Serialize + DeserializeOwned + Send + Sync + 'static,
-        OL: Lambda<N, ON>,
-    {
-        let (s, r) = sync::channel(20);
-        self.set_next(s)?;
-        other.set_source(r)?;
-        Ok(())
-    }
-
     fn check_set(&self) -> Result<(), CellError>;
 
-    async fn run(&self) -> Result<(), CellError> {
-        self.check_set()?;
-        let input = self.recv().await;
-        if let Some(i) = input {
-            match self.lambda(i).await {
-                Ok(n) => self.send(n).await,
-                Err(e) => {
-                    log::error!("Cell Error: {}", e);
-                    Err(CellError::from(e))?;
-                }
-            }
-        }
-        Ok(())
-    }
+    async fn run(&self) -> Result<(), CellError>;
 
     async fn spawn_loop(self) -> task::JoinHandle<()> {
         task::spawn(async move {
@@ -146,63 +181,39 @@ where
     }
 }
 
+pub trait SourceCell<N>
+where
+    N: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    fn set_next(&mut self, send: sync::Sender<N>) -> Result<(), CellError>;
+
+    fn link_to(&mut self, other: &mut dyn NextCell<N>) -> Result<(), CellError> {
+        let (s, r) = sync::channel(42);
+        self.set_next(s)?;
+        other.set_source(r)?;
+        Ok(())
+    }
+}
+
+pub trait NextCell<S>
+where
+    S: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    fn set_source(&mut self, recv: sync::Receiver<S>) -> Result<(), CellError>;
+}
+
 #[async_trait]
 pub trait Lambda<S, N>
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
     N: Serialize + DeserializeOwned + Send + Sync + 'static,
-    Self: Sync + Sized + Clone + Send + 'static,
+    Self: Sync + Sized + Clone + Send + 'static + Fn(S) -> anyhow::Result<N>,
 {
-    async fn run(&self, input: S) -> anyhow::Result<N>;
 }
 
-pub struct NullCell<S>
+impl <S, N, F>Lambda<S, N> for F
 where
     S: Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    source: Option<sync::Receiver<S>>,
-    next: Option<sync::Sender<()>>,
-}
-
-#[async_trait]
-impl<S> KosmosCell<S, ()> for NullCell<S>
-where
-    S: Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    fn set_source(&mut self, source: sync::Receiver<S>) -> Result<(), CellError> {
-        if self.source.is_some() {
-            Err(CellError::SourceExist)?;
-        }
-        self.source = Some(source);
-        Ok(())
-    }
-
-    fn set_next(&mut self, next: sync::Sender<()>) -> Result<(), CellError> {
-        if self.next.is_some() {
-            Err(CellError::NextExist)?;
-        }
-        self.next = Some(next);
-        Ok(())
-    }
-
-    async fn recv(&self) -> Option<S> {
-        self.source.as_ref().unwrap().recv().await
-    }
-
-    async fn send(&self, _pkg: ()) {
-        // Null Cell never send
-    }
-
-    fn check_set(&self) -> Result<(), CellError> {
-        if self.source.is_none() {
-            Err(CellError::SourceNotExist)?;
-        }
-        // null Cell can have no next
-        Ok(())
-    }
-
-    async fn lambda(&self, _input: S) -> anyhow::Result<()> {
-        log::trace!("Null lambda.");
-        Ok(())
-    }
-}
+    N: Serialize + DeserializeOwned + Send + Sync + 'static,
+    F: Sync + Sized + Clone + Send + 'static + Fn(S) -> anyhow::Result<N>,
+{}
