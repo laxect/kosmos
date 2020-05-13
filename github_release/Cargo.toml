@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 kosmos = { path = "../kosmos" }
 anyhow = "1.0.29"
-thiserror = "1.0.16"
+thiserror = "1.0.17"
 yukikaze = { path = "../yukikaze" }
 sled = "0.31.0"
 once_cell = "1.3.1"
