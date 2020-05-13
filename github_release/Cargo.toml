@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 kosmos = { path = "../kosmos" }
-anyhow = "1.0.28"
+anyhow = "1.0.29"
 thiserror = "1.0.16"
 yukikaze = { path = "../yukikaze" }
 sled = "0.31.0"
