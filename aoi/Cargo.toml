@@ -22,7 +22,7 @@ version = "1.5.0"
 features = ["attributes"]
 
 [dependencies.serde]
-version = "1.0.111"
+version = "1.0.112"
 features = ["derive"]
 
 [dependencies.structopt]
