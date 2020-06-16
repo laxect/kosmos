@@ -26,5 +26,5 @@ version = "1.0.112"
 features = ["derive"]
 
 [dependencies.structopt]
-version = "0.3.14"
+version = "0.3.15"
 default-features = false
