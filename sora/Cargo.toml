@@ -13,7 +13,7 @@ tide = "0.7.0"
 kosmos = { path = "../kosmos/" }
 once_cell = "1.4.0"
 yukikaze = { path = "../yukikaze/" }
-anyhow = "1.0.31"
+anyhow = "1.0.32"
 
 [dependencies.async-std]
 version = "1.5.0"
